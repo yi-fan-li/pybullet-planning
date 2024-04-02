@@ -1720,7 +1720,7 @@ def matrix_from_quat(quat):
 
 def quat_from_matrix(rot):
     matrix = np.eye(4)
-    matrix[:3, :3] = rot[:3, :3]
+    matrix[:3, :3] = np.array(rot)[:3, :3]
     return quaternion_from_matrix(matrix)
 
 def point_from_tform(tform):
@@ -3294,6 +3294,9 @@ DEFAULT_AABB_BUFFER = 0.02
 
 AABB = namedtuple('AABB', ['lower', 'upper'])
 
+def aabb_from_point(point):
+    return aabb_from_points([point])
+
 def aabb_from_points(points):
     return AABB(np.min(points, axis=0), np.max(points, axis=0))
 
@@ -3943,15 +3946,25 @@ def get_duration_fn(body, joints, velocities=None, norm=INF):
         return np.linalg.norm(durations, ord=norm)
     return fn
 
+def get_wrap_fn(body, joints):
+    # wrap_position | wrap_positions
+    circular_joints = [is_circular(body, joint) for joint in joints]
+    def fn(q):
+        return tuple(wrap_angle(value) if circular else value
+                     for circular, value in zip(circular_joints, q))
+    return fn
+
 def get_refine_fn(body, joints, num_steps=0):
     difference_fn = get_difference_fn(body, joints)
+    wrap_fn = get_wrap_fn(body, joints)
     num_steps = num_steps + 1
     def fn(q1, q2):
         q = q1
         for i in range(num_steps):
             positions = (1. / (num_steps - i)) * np.array(difference_fn(q2, q)) + q
             #q = tuple(positions)
-            q = tuple(wrap_positions(body, joints, positions)) # TODO: possible issue with adjust path
+            #q = tuple(wrap_positions(body, joints, positions)) # TODO: possible issue with adjust path
+            q = wrap_fn(positions)
             yield q
     return fn
 
