@@ -4034,10 +4034,19 @@ def waypoints_from_path(path, difference_fn=None, tolerance=1e-3):
 def adjust_path(robot, joints, path, initial_conf=None):
     if path is None:
         return path
+    if initial_conf is not None:
+        path = [initial_conf] + list(path)
+    difference_fn = get_difference_fn(robot, joints)
+    adjusted_path = [np.array(path[0])]
+    for conf in path[1:]:
+        difference = difference_fn(conf, adjusted_path[-1])
+        if not np.array_equal(difference, np.zeros(len(joints))):
+            adjusted_path.append(adjusted_path[-1] + difference)
+    return adjusted_path
+
     if initial_conf is None:
         initial_conf = path[0]
-        #initial_conf = get_joint_positions(robot, joints)
-    difference_fn = get_difference_fn(robot, joints)
+        #initial_conf = get_joint_positions(robot, joints) # TODO: this should be the default
     differences = [difference_fn(q2, q1) for q1, q2 in get_pairs(path)]
     adjusted_path = [np.array(initial_conf)] # Assumed the same as path[0] mod rotation
     for difference in differences:
