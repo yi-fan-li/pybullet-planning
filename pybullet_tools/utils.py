@@ -1421,7 +1421,7 @@ def set_camera_pose2(world_from_camera, **kwargs):
     # TODO: rename
     camera_world = point_from_pose(world_from_camera)
     #print(euler_from_quat(quat_from_pose(world_from_camera)))
-    target_world = get_camera_target(world_from_camera, **kwargs)
+    target_world = get_camera_target(world_from_camera, **kwargs) # TODO: discards roll
     set_camera_pose(camera_world, target_world)
     #roll, pitch, yaw = euler_from_quat(quat_from_pose(world_from_camera))
     # TODO: assert that roll is about zero?
@@ -1474,7 +1474,7 @@ def get_projection_matrix(width, height, vertical_fov, near, far):
     # gluPerspective() requires only 4 parameters; vertical field of view (FOV),
     # the aspect ratio of width to height and the distances to near and far clipping planes.
     aspect = float(width) / height
-    fov_degrees = math.degrees(vertical_fov)
+    fov_degrees = math.degrees(vertical_fov) # TODO: pass as degrees?
     projection_matrix = p.computeProjectionMatrixFOV(fov=fov_degrees, aspect=aspect,
                                                      nearVal=near, farVal=far, physicsClientId=CLIENT)
     #projection_matrix = p.computeProjectionMatrix(left=0, right=width, top=height, bottom=0,
@@ -1533,9 +1533,10 @@ def compute_camera_pose(camera_point, target_point=np.zeros(3)):
     view_matrix = compute_view_matrix(target_point, distance, yaw, pitch, roll=0., z_up=True)
     return pose_from_tform(view_matrix)
 
-def get_image(camera_pos=None, target_pos=None, width=640, height=480, vertical_fov=60.0, near=0.02, far=5.0,
+def get_image(camera_pos=None, target_pos=None, up_vector=None, width=640, height=480, vertical_fov=60.0, near=0.02, far=5.0,
               tiny=False, segment=False, **kwargs): # vertical_fov=90 seems to be the default
-    up_vector = [0, 0, 1] # up vector of the camera, in Cartesian world coordinates
+    if up_vector is None:
+        up_vector = [0, 0, 1] # up vector of the camera, in Cartesian world coordinates
     camera_flags = {}
     view_matrix = None
     if (camera_pos is None) or (target_pos is None):
@@ -1573,14 +1574,15 @@ def get_image(camera_pos=None, target_pos=None, width=640, height=480, vertical_
     #save_image(os.path.join(TEMP_DIR, 'rgb.png'), rgb) # [0, 255]
 
     if view_matrix is None:
-        view_matrix = np.identity(4) # TODO: hack
-    camera_tform = np.reshape(view_matrix, [4, 4]) # TODO: transpose?
-    camera_tform[:3, 3] = camera_pos
-    camera_tform[3, :3] = 0
+        camera_tform = np.identity(4)
+        camera_tform[:3, 3] = camera_pos # TODO: orientation
+    else:
+        camera_tform = np.reshape(view_matrix, [4, 4]).T
+        camera_tform = np.linalg.inv(camera_tform)
 
     view_pose = multiply(pose_from_tform(camera_tform), Pose(euler=Euler(roll=PI)))
 
-    focal_length = get_focal_lengths(height, vertical_fov) # TODO: horizontal_fov
+    focal_length = get_focal_lengths(height, math.radians(vertical_fov)) # TODO: horizontal_fov
     camera_matrix = get_camera_matrix(width, height, focal_length)
     
     return CameraImage(rgb, depth, segmented, view_pose, camera_matrix)
@@ -1593,7 +1595,9 @@ def get_image_at_pose(camera_pose, camera_matrix=None, far=5.0, **kwargs):
         kwargs.update(dict(width=width, height=height, vertical_fov=vertical_fov))
     camera_point = point_from_pose(camera_pose)
     target_point = tform_point(camera_pose, np.array([0, 0, far]))
-    return get_image(camera_point, target_point, far=far, **kwargs)
+    camera_quat = quat_from_pose(camera_pose)
+    up_vector = tform_point(pose_from_quat(camera_quat), np.array([1, 0, 0])) # TOOD: ineffective
+    return get_image(camera_point, target_point, up_vector=up_vector, far=far, **kwargs)
 
 def set_default_camera(yaw=160, pitch=-35, distance=2.5):
     # TODO: deprecate
@@ -1677,6 +1681,7 @@ def quat_from_axis_angle(axis, angle): # axis-angle
     #return np.append(math.sin(angle/2) * get_unit_vector(axis), [math.cos(angle / 2)])
 
 def unit_pose():
+    # return pose_from_point_quat()
     return (unit_point(), unit_quat())
 
 def all_close(a, b, atol=1e-6, rtol=0.):
@@ -1742,11 +1747,23 @@ def tform_from_pose(pose):
     tform[:3,:3] = matrix_from_quat(quat)
     return tform
 
-def pose_from_point_quat(point, quat):
+def pose_from_point_quat(point=None, quat=None):
+    if point is None:
+        point = unit_point()
+    if quat is None:
+        quat = unit_quat()
     return point, quat
 
+def pose_from_point(point):
+    return pose_from_point_quat(point=point)
+
+def pose_from_quat(quat):
+    return pose_from_point_quat(quat=quat)
+
 def pose_from_tform(tform):
-    return point_from_tform(tform), quat_from_matrix(matrix_from_tform(tform))
+    point = point_from_tform(tform)
+    quat = quat_from_matrix(matrix_from_tform(tform))
+    return point, quat
 
 def normalize_interval(value, interval=UNIT_LIMITS):
     lower, upper = interval
@@ -3333,6 +3350,7 @@ def aabb_difference(aabb1, aabb2):
     return difference1 + difference2
 
 def aabb_distance(aabb1, aabb2, **kwargs):
+    # TODO: point distance
     return get_length(aabb_difference(aabb1, aabb2), **kwargs)
 
 def aabb_empty(aabb):
