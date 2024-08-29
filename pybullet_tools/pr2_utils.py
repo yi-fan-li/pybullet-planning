@@ -18,7 +18,7 @@ from .utils import multiply, get_link_pose, set_joint_position, set_joint_positi
     movable_from_joints, quat_from_axis_angle, LockRenderer, Euler, get_links, get_link_name, \
     get_extend_fn, get_moving_links, link_pairs_collision, get_link_subtree, \
     clone_body, get_all_links, pairwise_collision, tform_point, get_camera_matrix, ray_from_pixel, pixel_from_ray, dimensions_from_camera_matrix, \
-    wrap_angle, TRANSPARENT, PI, OOBB, pixel_from_point, set_all_color, wait_if_gui, get_sample_fn, elapsed_time, wait_unlocked, get_unit_vector
+    wrap_angle, TRANSPARENT, PI, OOBB, pixel_from_point, set_all_color, wait_if_gui, get_sample_fn, elapsed_time, wait_unlocked, get_unit_vector, recenter_oobb
 
 # TODO: restrict number of pr2 rotations to prevent from wrapping too many times
 
@@ -710,7 +710,7 @@ def get_view_aabb(body, view_pose, **kwargs):
         return get_aabb(body, **kwargs)
 
 def get_view_oobb(body, view_pose, **kwargs):
-    return OOBB(get_view_aabb(body, view_pose, **kwargs), view_pose)
+    return recenter_oobb(OOBB(get_view_aabb(body, view_pose, **kwargs), view_pose))
 
 def get_detection_cone(pr2, body, camera_link=HEAD_LINK_NAME, depth=MAX_VISUAL_DISTANCE, **kwargs):
     head_link = link_from_name(pr2, camera_link)

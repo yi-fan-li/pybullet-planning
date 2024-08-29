@@ -649,8 +649,8 @@ def apply_alpha(color, alpha=1.):
     red, green, blue = remove_alpha(color)
     return RGBA(red, green, blue, alpha)
 
-def spaced_colors(n, s=1, v=1):
-    return [RGB(*colorsys.hsv_to_rgb(h, s, v)) for h in np.linspace(0, 1, n, endpoint=False)]
+def spaced_colors(n, s=1., v=1., h1=0., h2=1.):
+    return [RGB(*colorsys.hsv_to_rgb(h, s, v)) for h in np.linspace(h1, h2, n, endpoint=False)]
 
 #####################################
 
