@@ -202,6 +202,10 @@ class GripperCommand(Command):
         joints = get_gripper_joints(self.robot, self.arm)
         start_conf = get_joint_positions(self.robot, joints)
         end_conf = [self.position] * len(joints)
+        if isinstance(self.position, float): # Github fix taken from https://github.com/caelan/pddlstream/issues/44
+            end_conf = [self.position] * len(joints)
+        else:
+            end_conf = self.position
         if self.teleport:
             path = [start_conf, end_conf]
         else:
